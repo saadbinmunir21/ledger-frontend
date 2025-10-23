@@ -18,6 +18,7 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
     dueOn: "",
     debit: "",
     credit: "",
+    remarks: "", // ✅ new field
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,12 +26,17 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
   useEffect(() => {
     if (existingTransaction) {
       setForm({
-        dateOfEntry: existingTransaction.dateOfEntry ? new Date(existingTransaction.dateOfEntry).toISOString().slice(0, 10) : "",
+        dateOfEntry: existingTransaction.dateOfEntry
+          ? new Date(existingTransaction.dateOfEntry).toISOString().slice(0, 10)
+          : "",
         reference: existingTransaction.reference ?? "",
         description: existingTransaction.description ?? "",
-        dueOn: existingTransaction.dueOn ? new Date(existingTransaction.dueOn).toISOString().slice(0, 10) : "",
+        dueOn: existingTransaction.dueOn
+          ? new Date(existingTransaction.dueOn).toISOString().slice(0, 10)
+          : "",
         debit: existingTransaction.debit ?? "",
         credit: existingTransaction.credit ?? "",
+        remarks: existingTransaction.remarks ?? "", // ✅ populate remarks if editing
       });
     } else {
       setForm({
@@ -40,6 +46,7 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
         dueOn: "",
         debit: "",
         credit: "",
+        remarks: "",
       });
     }
   }, [existingTransaction]);
@@ -58,11 +65,12 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
 
     const payload = {
       dateOfEntry: form.dateOfEntry,
-      reference: form.reference ? Number(form.reference) : undefined,
+      reference: form.reference || undefined, // ✅ keep as string
       description: form.description,
       dueOn: form.dueOn || undefined,
       debit: form.debit ? Number(form.debit) : 0,
       credit: form.credit ? Number(form.credit) : 0,
+      remarks: form.remarks || "", // ✅ include remarks
     };
 
     try {
@@ -77,6 +85,7 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
       onSaved(res.data);
       onClose();
     } catch (err) {
+      console.error("Transaction save failed:", err);
       setError(err?.response?.data?.error || "Failed to save transaction");
     } finally {
       setLoading(false);
@@ -88,45 +97,110 @@ const AddTransactionModal = ({ accountId, onClose, onSaved, existingTransaction 
       <div className="modal glass modal-lg">
         <div className="modal-head">
           <h3>{existingTransaction ? "Edit Transaction" : "Add Transaction"}</h3>
-          <button className="close" onClick={onClose} aria-label="Close">&times;</button>
+          <button className="close" onClick={onClose} aria-label="Close">
+            &times;
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-body grid-2">
           <label className="field">
             <div className="label">Date</div>
-            <input type="date" name="dateOfEntry" value={form.dateOfEntry} onChange={handleChange} className="input" required />
+            <input
+              type="date"
+              name="dateOfEntry"
+              value={form.dateOfEntry}
+              onChange={handleChange}
+              className="input"
+              required
+            />
           </label>
 
           <label className="field">
-            <div className="label">Due on</div>
-            <input type="date" name="dueOn" value={form.dueOn} onChange={handleChange} className="input" />
+            <div className="label">Due on (Optional)</div>
+            <input
+              type="date"
+              name="dueOn"
+              value={form.dueOn}
+              onChange={handleChange}
+              className="input"
+            />
           </label>
 
           <label className="field full">
             <div className="label">Reference #</div>
-            <input type="number" name="reference" value={form.reference} onChange={handleChange} className="input" placeholder="Optional" />
+            <input
+              type="text"
+              name="reference"
+              value={form.reference}
+              onChange={handleChange}
+              className="input"
+              placeholder="Optional"
+            />
           </label>
 
           <label className="field full">
             <div className="label">Description</div>
-            <input type="text" name="description" value={form.description} onChange={handleChange} className="input" placeholder="Description" />
+            <input
+              type="text"
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              className="input"
+              placeholder="Description"
+            />
+          </label>
+
+          <label className="field full">
+            <div className="label">Remarks</div>
+            <input
+              type="text"
+              name="remarks"
+              value={form.remarks}
+              onChange={handleChange}
+              className="input"
+              placeholder="Optional remarks"
+            />
           </label>
 
           <label className="field">
             <div className="label">Debit</div>
-            <input type="number" name="debit" step="0.01" value={form.debit} onChange={handleChange} className="input" placeholder="0.00" />
+            <input
+              type="number"
+              name="debit"
+              step="0.01"
+              value={form.debit}
+              onChange={handleChange}
+              className="input"
+              placeholder="0.00"
+            />
           </label>
 
           <label className="field">
             <div className="label">Credit</div>
-            <input type="number" name="credit" step="0.01" value={form.credit} onChange={handleChange} className="input" placeholder="0.00" />
+            <input
+              type="number"
+              name="credit"
+              step="0.01"
+              value={form.credit}
+              onChange={handleChange}
+              className="input"
+              placeholder="0.00"
+            />
           </label>
 
           {error && <div className="error full">{error}</div>}
 
           <div className="modal-actions full">
-            <button type="button" className="btn outline" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn primary" disabled={loading}>{loading ? "Saving..." : existingTransaction ? "Update" : "Add Transaction"}</button>
+            <button type="button" className="btn outline" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn primary" disabled={loading}>
+              {loading
+                ? "Saving..."
+                : existingTransaction
+                ? "Update"
+                : "Add Transaction"}
+            </button>
           </div>
         </form>
       </div>

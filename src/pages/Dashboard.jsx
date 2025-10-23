@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "../api";
 import AddAccountModal from "../components/AddAccountModal";
 import AddTransactionModal from "../components/AddTransactionModal";
-import "../App.css"; // single global CSS file as requested
+import "../App.css";
 
 const Dashboard = () => {
   const [accounts, setAccounts] = useState([]);
@@ -14,7 +14,7 @@ const Dashboard = () => {
   const [showAddTx, setShowAddTx] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
 
-  // Fetch accounts from backend
+  // Fetch accounts
   const fetchAccounts = async () => {
     try {
       const res = await api.get("/accounts");
@@ -24,7 +24,7 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch transactions for selected account
+  // Fetch transactions
   const fetchTransactions = async (accountId) => {
     if (!accountId) {
       setTransactions([]);
@@ -33,7 +33,13 @@ const Dashboard = () => {
     setLoadingTx(true);
     try {
       const res = await api.get(`/transactions/${accountId}`);
-      setTransactions(res.data);
+      // Sort by dateOfEntry descending + _id descending for same-date transactions
+      const sortedTx = res.data.sort((a, b) => {
+        const dateDiff = new Date(b.dateOfEntry) - new Date(a.dateOfEntry);
+        if (dateDiff !== 0) return dateDiff;
+        return b._id.localeCompare(a._id); // newest first for same date
+      });
+      setTransactions(sortedTx);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
     } finally {
@@ -50,18 +56,14 @@ const Dashboard = () => {
     else setTransactions([]);
   }, [selectedAccountId]);
 
-  // called when new account created
   const handleAccountAdded = (newAcc) => {
     setAccounts((p) => [...p, newAcc]);
   };
 
-  // called when transaction added or updated
-  const handleTxSaved = (tx) => {
-    // refetch to get server-side recalculated balances
+  const handleTxSaved = () => {
     fetchTransactions(selectedAccountId);
   };
 
-  // delete transaction
   const handleDeleteTransaction = async (txId) => {
     if (!window.confirm("Delete this transaction?")) return;
     try {
@@ -73,7 +75,6 @@ const Dashboard = () => {
     }
   };
 
-  // open edit modal
   const handleEditTransaction = (tx) => {
     setEditingTx(tx);
   };
@@ -103,13 +104,11 @@ const Dashboard = () => {
                 </option>
               ))}
             </select>
-            
           </div>
 
           <button
             className="btn neutral"
             onClick={() => setShowAddAccount(true)}
-            title="Add a new account"
           >
             + Add Account
           </button>
@@ -124,9 +123,6 @@ const Dashboard = () => {
               {selectedAccountId
                 ? accounts.find((a) => a._id === selectedAccountId)?.name ?? "—"
                 : "No account selected"}
-            </div>
-            <div className="card-note">
-              Choose an account from the top-right selector to view transactions.
             </div>
           </div>
 
@@ -144,11 +140,7 @@ const Dashboard = () => {
               </button>
               <button
                 className="btn outline"
-                onClick={() => {
-                  // keep original functionality unchanged; this is just a placeholder action that you can customize
-                  if (!selectedAccountId) return alert("Select an account first");
-                  fetchTransactions(selectedAccountId);
-                }}
+                onClick={() => selectedAccountId && fetchTransactions(selectedAccountId)}
               >
                 Refresh
               </button>
@@ -168,31 +160,21 @@ const Dashboard = () => {
 
           <div className="table-body">
             {!selectedAccountId ? (
-              <div className="empty-state">
-                <img
-                  src=""
-                  alt=""
-                  aria-hidden
-                  style={{ width: 160, opacity: 0.06 }}
-                />
-                <div className="empty-title">No account selected</div>
-                <div className="empty-sub">Select an account to show its transactions</div>
-              </div>
+              <div className="empty-state">Select an account to view transactions.</div>
             ) : loadingTx ? (
               <div className="loading">Loading transactions…</div>
             ) : transactions.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-title">No transactions yet</div>
-                <div className="empty-sub">Add your first transaction using the button above.</div>
-              </div>
+              <div className="empty-state">No transactions yet.</div>
             ) : (
               <div className="table-responsive">
                 <table className="tx-table">
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>Due Date</th>
                       <th>Ref</th>
                       <th>Description</th>
+                      <th>Remarks</th>
                       <th className="numeric">Debit</th>
                       <th className="numeric">Credit</th>
                       <th className="numeric">Balance</th>
@@ -203,11 +185,13 @@ const Dashboard = () => {
                     {transactions.map((tx) => (
                       <tr key={tx._id}>
                         <td>{new Date(tx.dateOfEntry).toLocaleDateString()}</td>
-                        <td>{tx.reference ?? "-"}</td>
-                        <td className="desc">{tx.description ?? "-"}</td>
-                        <td className="numeric">{tx.debit ? Number(tx.debit).toFixed(2) : "-"}</td>
-                        <td className="numeric">{tx.credit ? Number(tx.credit).toFixed(2) : "-"}</td>
-                        <td className="numeric balance">{Number(tx.balance ?? 0).toFixed(2)}</td>
+                        <td>{tx.dueOn ? new Date(tx.dueOn).toLocaleDateString() : "-"}</td>
+                        <td>{tx.reference || "-"}</td>
+                        <td>{tx.description || "-"}</td>
+                        <td>{tx.remarks || "-"}</td>
+                        <td className="numeric">{tx.debit ? tx.debit.toFixed(2) : "-"}</td>
+                        <td className="numeric">{tx.credit ? tx.credit.toFixed(2) : "-"}</td>
+                        <td className="numeric balance">{tx.balance?.toFixed(2) || "0.00"}</td>
                         <td className="actions">
                           <button className="btn icon edit" onClick={() => handleEditTransaction(tx)}>
                             Edit
@@ -226,7 +210,6 @@ const Dashboard = () => {
         </section>
       </main>
 
-      {/* Modals */}
       {showAddAccount && (
         <AddAccountModal
           onClose={() => setShowAddAccount(false)}
@@ -237,31 +220,19 @@ const Dashboard = () => {
         />
       )}
 
-      {showAddTx && (
+      {(showAddTx || editingTx) && (
         <AddTransactionModal
           accountId={selectedAccountId}
-          onClose={() => setShowAddTx(false)}
-          onSaved={(tx) => {
-            handleTxSaved(tx);
-            setShowAddTx(false);
-          }}
-        />
-      )}
-
-      {editingTx && (
-        <AddTransactionModal
           existingTransaction={editingTx}
-          onClose={() => setEditingTx(null)}
-          onSaved={(tx) => {
-            handleTxSaved(tx);
+          onClose={() => {
+            setShowAddTx(false);
             setEditingTx(null);
           }}
+          onSaved={handleTxSaved}
         />
       )}
     </div>
   );
-
-
 };
 
 export default Dashboard;
