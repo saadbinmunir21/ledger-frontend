@@ -50,13 +50,6 @@ const AddAccountModal = ({ onClose, onAccountAdded, accounts, onToggleClosed }) 
             {error && <div className="error">{error}</div>}
 
             <div className="modal-actions">
-              <button 
-                type="button" 
-                className="btn outline" 
-                onClick={() => setShowManageAccounts(true)}
-              >
-                Manage Accounts
-              </button>
               <button type="button" className="btn outline" onClick={onClose}>
                 Cancel
               </button>
